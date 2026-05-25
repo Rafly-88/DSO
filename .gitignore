@@ -1,10 +1,24 @@
 *.pro
 *.pro.user
 *.pro.user*
-build*
-build-*
+
+# Build output directories (NOT build scripts!)
+build/
+build_arm/
+build_ubuntu/
+build-*/
+
+# Compiled objects & libraries
 *.o
 *.so
 *.a
 *.so.*
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*~
+
+# Misc
 thirdparty/libzip-1.1.1
