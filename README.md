@@ -1,33 +1,33 @@
-# DSO — Direct Sparse Odometry dengan Pangolin Fisheye Shader
+# DSO — Direct Sparse Odometry with Pangolin Fisheye Shader
 
-Implementasi **Direct Sparse Odometry (DSO)** dengan integrasi **shader Pangolin**
-untuk visualisasi live kamera fisheye. Mendukung build di **ARM (Jetson)** maupun
-**Ubuntu x86_64 biasa**.
+A **Direct Sparse Odometry (DSO)** implementation with integrated **Pangolin
+shader** support for live fisheye-camera visualization. Builds on both
+**ARM (Jetson)** and **standard Ubuntu x86_64**.
 
-> Repository ini berbasis pada [DSO asli oleh Jakob Engel](https://github.com/JakobEngel/dso)
-> (TU Munich, GPLv3), dengan tambahan modul GPU shader untuk unwarping fisheye
-> dan dukungan multi-arsitektur. Lihat bagian [Lisensi](#lisensi) di bawah.
+> This repository is based on [the original DSO by Jakob Engel](https://github.com/JakobEngel/dso)
+> (TU Munich, GPLv3), extended with a GPU shader module for fisheye unwarping
+> and multi-architecture build support. See the [License](#license) section
+> at the bottom.
 
 ---
 
-## Fitur Utama
+## Key Features
 
-- **Multi-arsitektur** — auto-detect ARM vs x86_64 di `CMakeLists.txt`
-  - ARM: pakai `thirdparty/sse2neon` untuk translasi SSE → NEON
-  - x86_64: pakai header SSE/AVX bawaan toolchain
-- **Build script terpisah** yang tidak saling tabrakan:
-  - `build_jetson.sh` → output ke `build_arm/`
-  - `build_ubuntu.sh` → output ke `build_ubuntu/`
-- **4 mode shader fisheye GPU** (dimuat saat runtime, bisa diedit tanpa rebuild):
+- **Multi-architecture** — `CMakeLists.txt` auto-detects ARM vs x86_64
+  - ARM: uses `thirdparty/sse2neon` to translate SSE → NEON
+  - x86_64: uses the toolchain's native SSE/AVX headers
+- **Separate build scripts** with no output collision:
+  - `build_jetson.sh` → outputs to `build_arm/`
+  - `build_ubuntu.sh` → outputs to `build_ubuntu/`
+- **Four GPU fisheye shader modes** (loaded at runtime, editable without rebuild):
   - `anypoint_mode1` — virtual perspective camera (alpha/beta + zoom)
   - `anypoint_mode2` — Euler angles (thetaX/thetaY)
-  - `panorama_tube`  — unwarp 360° silindris
-  - `panorama_car`   — bird's-eye panorama untuk kamera kendaraan
-- **Dual-path processing** — GPU untuk visualisasi, CPU (`AnypointRemap`) untuk
-  feature detection pipeline
-- **Hardening untuk fresh install** — script otomatis install semua dependency,
-  build Pangolin dari source kalau belum ada, dan batasi parallel job untuk
-  menghindari OOM
+  - `panorama_tube`  — 360° cylindrical unwarp
+  - `panorama_car`   — bird's-eye panorama for vehicle-mounted cameras
+- **Dual-path processing** — GPU for visualization, CPU (`AnypointRemap`) for
+  the feature-detection pipeline
+- **Hardened for fresh installs** — scripts auto-install all dependencies,
+  build Pangolin from source if missing, and cap parallel jobs to avoid OOM
 
 ---
 
@@ -51,93 +51,96 @@ chmod +x build_jetson.sh
 ./build_jetson.sh
 ```
 
-Binary akan ada di `build_ubuntu/bin/` atau `build_arm/bin/`.
+Binaries land in `build_ubuntu/bin/` or `build_arm/bin/`.
 
-📖 **Panduan instalasi lengkap, troubleshooting, dan cara menjalankan ada di
+📖 **Full installation guide, troubleshooting, and runtime usage live in
 [INSTALL.md](INSTALL.md).**
 
 ---
 
-## Struktur Project
+## Project Layout
 
 ```
 DSO/
-├── build_jetson.sh        # Build script ARM/Jetson      → build_arm/
-├── build_ubuntu.sh        # Build script Ubuntu x86_64   → build_ubuntu/
-├── CMakeLists.txt         # Auto-detect ARM vs x86_64
-├── INSTALL.md             # Panduan instalasi lengkap
-├── README.md              # File ini
-├── camera.txt             # Template file kalibrasi kamera
-├── cmake/                 # Modul CMake (FindSuiteParse, dll.)
-├── shaders/               # GLSL shader fisheye (dimuat runtime)
+├── build_jetson.sh        # Build script for ARM/Jetson    → build_arm/
+├── build_ubuntu.sh        # Build script for Ubuntu x86_64 → build_ubuntu/
+├── CMakeLists.txt         # Auto-detects ARM vs x86_64
+├── INSTALL.md             # Full installation guide
+├── README.md              # This file
+├── camera.txt             # Camera calibration file template
+├── cmake/                 # CMake modules (FindSuiteParse, etc.)
+├── shaders/               # GLSL fisheye shaders (loaded at runtime)
 ├── src/
 │   ├── FullSystem/        # Core SLAM (tracking + mapping)
 │   ├── OptimizationBackend/   # Photometric bundle adjustment
 │   ├── IOWrapper/         # Pangolin viewer + shader manager + OpenCV IO
-│   └── util/              # Kalibrasi, undistort, AnypointRemap (CPU)
+│   └── util/              # Calibration, undistort, AnypointRemap (CPU)
 └── thirdparty/
-    ├── Sophus/            # Lie group (SE3/Sim3)
-    └── sse2neon/          # Shim SSE→NEON (hanya dipakai saat build ARM)
+    ├── Sophus/            # Lie group library (SE3/Sim3)
+    └── sse2neon/          # SSE→NEON shim (used only on ARM builds)
 ```
 
 ---
 
-## Binary yang Dihasilkan
+## Produced Binaries
 
-| Binary        | Untuk apa                                                          |
-| ------------- | ------------------------------------------------------------------ |
-| `dso_dataset` | Memutar dataset offline (sequence gambar + file kalibrasi)         |
-| `dso_live`    | Live capture dari source video (file/streaming) via OpenCV         |
-| `dso_camera`  | Real-time capture langsung dari kamera (USB / CSI)                 |
+| Binary        | Purpose                                                              |
+| ------------- | -------------------------------------------------------------------- |
+| `dso_dataset` | Plays back an offline dataset (image sequence + calibration file)    |
+| `dso_live`    | Live capture from a video source (file/stream) via OpenCV            |
+| `dso_camera`  | Real-time capture straight from a camera (USB / CSI)                 |
 
-Contoh menjalankan dataset:
+Example: running on a dataset
 
 ```bash
 cd build_ubuntu/bin
-./dso_dataset files=/path/ke/sequence calib=/path/ke/camera.txt mode=1
+./dso_dataset files=/path/to/sequence calib=/path/to/camera.txt mode=1
 ```
 
-Detail opsi runtime ada di [INSTALL.md](INSTALL.md) bagian "Menjalankan".
+Full runtime options are documented in the "Running" section of
+[INSTALL.md](INSTALL.md).
 
 ---
 
-## Persyaratan Sistem
+## System Requirements
 
-| Target           | Minimum                                          |
-| ---------------- | ------------------------------------------------ |
-| Jetson / ARM     | Jetson Orin Nano 8GB (atau board aarch64 setara) |
-| Ubuntu x86_64    | CPU dengan SSE4.2, RAM ≥ 4GB (8GB direkomendasi) |
-| OS               | Ubuntu 20.04 / 22.04 / 24.04                     |
+| Target           | Minimum                                            |
+| ---------------- | -------------------------------------------------- |
+| Jetson / ARM     | Jetson Orin Nano 8GB (or equivalent aarch64 board) |
+| Ubuntu x86_64    | CPU with SSE4.2, ≥ 4GB RAM (8GB recommended)       |
+| OS               | Ubuntu 20.04 / 22.04 / 24.04                       |
 
-Build script akan otomatis install semua dependency via `apt` (SuiteSparse,
-Eigen3, Boost system+thread, OpenCV, OpenGL/GLEW, Wayland, FFmpeg) dan build
-Pangolin v0.9.1 dari source kalau belum ada.
-
----
-
-## Kontribusi & Issue
-
-Buka issue di tab [Issues](https://github.com/Rafly-88/DSO/issues) kalau
-menemukan bug atau ingin request fitur. Pull request welcome.
+The build scripts auto-install all dependencies via `apt` (SuiteSparse,
+Eigen3, Boost system+thread, OpenCV, OpenGL/GLEW, Wayland, FFmpeg) and build
+Pangolin v0.9.1 from source if it's not already present.
 
 ---
 
-## Referensi
+## Contributing & Issues
 
-Paper DSO asli — bacalah ini untuk memahami algoritma dasarnya:
+Open an issue under [Issues](https://github.com/Rafly-88/DSO/issues) for bugs
+or feature requests. Pull requests are welcome.
+
+---
+
+## References
+
+Original DSO papers — read these to understand the underlying algorithm:
 
 - J. Engel, V. Koltun, D. Cremers — *Direct Sparse Odometry*, arXiv:1607.02565, 2016
 - J. Engel, V. Usenko, D. Cremers — *A Photometrically Calibrated Benchmark For
   Monocular Visual Odometry*, arXiv:1607.02555, 2016
 
-Dataset publik untuk testing: <https://vision.in.tum.de/mono-dataset>
+Public dataset for testing: <https://vision.in.tum.de/mono-dataset>
 
 ---
 
-## Lisensi
+## License
 
-Repository ini dirilis di bawah **GPLv3** (lihat [LICENSE](LICENSE)),
-mengikuti lisensi DSO asli oleh Jakob Engel dan kolaborator (TU Munich).
+This repository is released under **GPLv3** (see [LICENSE](LICENSE)),
+following the license of the original DSO by Jakob Engel and collaborators
+(TU Munich).
 
-Modifikasi dan tambahan di repository ini (Pangolin fisheye shader integration,
-ARM/Ubuntu build scripts, dokumentasi) © Rafly-88, juga di bawah GPLv3.
+Modifications and additions in this repository (Pangolin fisheye shader
+integration, ARM/Ubuntu build scripts, documentation) © Rafly-88, also under
+GPLv3.

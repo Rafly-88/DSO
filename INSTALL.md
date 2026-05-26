@@ -1,170 +1,171 @@
-# Panduan Instalasi DSO (Direct Sparse Odometry)
+# DSO Installation Guide (Direct Sparse Odometry)
 
-Implementasi DSO dengan integrasi shader Pangolin untuk visualisasi fisheye.
-Mendukung dua target build yang **saling terpisah** (artefak ditaruh di
-direktori berbeda, tidak akan saling timpa):
+A DSO implementation with integrated Pangolin shader support for fisheye
+visualization. Two build targets are supported, with **fully separated**
+output (artifacts live in different directories so they never overwrite
+each other):
 
 | Target           | Build script        | Output directory  |
 | ---------------- | ------------------- | ----------------- |
 | ARM / Jetson     | `build_jetson.sh`   | `build_arm/`      |
 | Ubuntu x86_64    | `build_ubuntu.sh`   | `build_ubuntu/`   |
 
-`CMakeLists.txt` otomatis mendeteksi arsitektur (`CMAKE_SYSTEM_PROCESSOR`)
-dan mengaktifkan flag yang tepat:
+`CMakeLists.txt` auto-detects the architecture (`CMAKE_SYSTEM_PROCESSOR`)
+and enables the right flags:
 
-- **aarch64 / arm** → include `thirdparty/sse2neon` (shim SSE → NEON)
-- **x86_64** → pakai header SSE/AVX bawaan toolchain + `-msse4.2`
+- **aarch64 / arm** → includes `thirdparty/sse2neon` (SSE → NEON shim)
+- **x86_64** → uses the toolchain's native SSE/AVX headers + `-msse4.2`
 
 ---
 
 ## Quick Start
 
-Untuk yang ingin langsung jalan di Ubuntu x86_64:
+To just get going on Ubuntu x86_64:
 
 ```bash
 git clone --recursive https://github.com/Rafly-88/DSO.git
-cd <REPO>
+cd DSO
 chmod +x build_ubuntu.sh
 ./build_ubuntu.sh
 ```
 
-Setelah selesai, binary ada di `build_ubuntu/bin/`. Sisanya di bawah.
+When the build finishes, binaries are in `build_ubuntu/bin/`. The rest of
+this document covers the details.
 
 ---
 
-## 1. Prasyarat
+## 1. Prerequisites
 
 ### Hardware
 
-| Target           | Minimum                                          |
-| ---------------- | ------------------------------------------------ |
-| Jetson / ARM     | Jetson Orin Nano 8GB (atau board aarch64 setara) |
-| Ubuntu x86_64    | CPU dengan SSE4.2, RAM ≥ 4GB (8GB direkomendasi) |
+| Target           | Minimum                                            |
+| ---------------- | -------------------------------------------------- |
+| Jetson / ARM     | Jetson Orin Nano 8GB (or equivalent aarch64 board) |
+| Ubuntu x86_64    | CPU with SSE4.2, ≥ 4GB RAM (8GB recommended)       |
 
-### Sistem Operasi
+### Operating System
 
 - Ubuntu 20.04 / 22.04 / 24.04 (x86_64)
-- Ubuntu 22.04 di Jetson (JetPack 6.x)
+- Ubuntu 22.04 on Jetson (JetPack 6.x)
 
-### Dependencies utama
+### Main Dependencies
 
-Build script akan otomatis menginstal semuanya via `apt`:
+The build scripts install all of these automatically via `apt`:
 
 - `build-essential`, `cmake`, `git`, `pkg-config`
 - `libsuitesparse-dev`, `libeigen3-dev`
 - `libboost-system-dev`, `libboost-thread-dev`
-  (DSO hanya butuh dua komponen Boost ini — **jangan** pakai `libboost-all-dev`
-  yang menarik `libboost-python1.74-dev` dan bentrok dengan `python3-dev`
-  di Ubuntu fresh install)
+  (DSO only needs these two Boost components — **do not** install
+  `libboost-all-dev`, which pulls in `libboost-python1.74-dev` and conflicts
+  with `python3-dev` on fresh Ubuntu installs)
 - `libopencv-dev`
 - `libgl1-mesa-dev`, `libglew-dev`, `libegl1-mesa-dev`
 - `libwayland-dev`, `libxkbcommon-dev`, `wayland-protocols`
 - `libavcodec-dev`, `libavutil-dev`, `libavformat-dev`, `libswscale-dev`, `libavdevice-dev`
 
-**Pangolin** (v0.9.1) akan otomatis di-clone & di-build dari source kalau
-belum terdeteksi di sistem (di-install ke `/usr/local`).
+**Pangolin** (v0.9.1) is automatically cloned and built from source if it's
+not already detected on the system (installed to `/usr/local`).
 
 ---
 
-## 2. Clone Repository
+## 2. Clone the Repository
 
-Repository ini menggunakan git submodule (`thirdparty/sse2neon`), jadi
-gunakan `--recursive`:
+The repo uses a git submodule (`thirdparty/sse2neon`), so clone with
+`--recursive`:
 
 ```bash
 git clone --recursive https://github.com/Rafly-88/DSO.git
-cd <REPO>
+cd DSO
 ```
 
-Kalau sudah terlanjur clone tanpa `--recursive`:
+If you already cloned without `--recursive`:
 
 ```bash
 git submodule update --init --recursive
 ```
 
-> **Catatan**: kalau Anda tidak punya `git` di sistem fresh, jangan khawatir —
-> build script akan install `git` lewat apt terlebih dahulu, baru kemudian
-> menjalankan `git submodule update`. Jadi cukup ekstrak ZIP dari GitHub
-> lalu jalankan build script-nya.
+> **Note**: if your fresh system doesn't have `git` yet, don't worry — the
+> build script installs `git` via apt first, then runs `git submodule update`.
+> So you can just download the ZIP from GitHub and run the build script.
 
 ---
 
-## 3. Build (Otomatis — disarankan)
+## 3. Build (Automatic — recommended)
 
-### Di Ubuntu x86_64
+### On Ubuntu x86_64
 
 ```bash
 chmod +x build_ubuntu.sh
 ./build_ubuntu.sh
 ```
 
-Output → `build_ubuntu/bin/` dan `build_ubuntu/lib/libdso.a`
+Output → `build_ubuntu/bin/` and `build_ubuntu/lib/libdso.a`
 
-### Di Jetson / ARM (aarch64)
+### On Jetson / ARM (aarch64)
 
 ```bash
 chmod +x build_jetson.sh
 ./build_jetson.sh
 ```
 
-Output → `build_arm/bin/` dan `build_arm/lib/libdso.a`
+Output → `build_arm/bin/` and `build_arm/lib/libdso.a`
 
-### Cara menjalankan kalau `./build_*.sh` gagal
+### What to do if `./build_*.sh` fails to run
 
-Ada tiga cara setara untuk menjalankan script:
+Three equivalent ways to invoke the script:
 
 ```bash
-chmod +x build_ubuntu.sh && ./build_ubuntu.sh   # standar
-bash build_ubuntu.sh                            # tanpa perlu chmod
-sh   build_ubuntu.sh                            # juga jalan
+chmod +x build_ubuntu.sh && ./build_ubuntu.sh   # standard
+bash build_ubuntu.sh                            # no chmod needed
+sh   build_ubuntu.sh                            # also works
 ```
 
-### ⚠️ JANGAN jalankan dengan `sudo`
+### ⚠️ DO NOT run the script with `sudo`
 
 ```bash
-# ❌ JANGAN
+# ❌ DON'T
 sudo ./build_ubuntu.sh
 
-# ✅ BENAR
+# ✅ DO
 ./build_ubuntu.sh
 ```
 
-Script ini sudah memanggil `sudo apt-get install` di dalam saat dibutuhkan.
-Kalau seluruh script dijalankan dengan `sudo`:
+The script already calls `sudo apt-get install` internally where needed.
+If you run the whole script with `sudo`:
 
-- `$HOME` jadi `/root` → Pangolin akan ter-clone ke `/root/Pangolin`
-- Folder `build_ubuntu/` jadi milik root → susah dihapus tanpa sudo
+- `$HOME` becomes `/root` → Pangolin will be cloned into `/root/Pangolin`
+- The `build_ubuntu/` directory will be owned by root → hard to delete without sudo
 
-Jalankan sebagai user biasa; nanti sudo akan minta password sekali untuk `apt`.
+Run it as a regular user; sudo will prompt for the password once for `apt`.
 
-### Mengatur jumlah thread compile
+### Controlling the number of compile threads
 
-Secara default kedua script pakai **setengah** dari core CPU agar tidak OOM
-(template Eigen/Sophus sangat berat di memori saat compile). Override dengan
-env var `JOBS=N`:
+By default both scripts use **half** of the available CPU cores to avoid OOM
+(Eigen/Sophus templates are very memory-hungry during compilation). Override
+with the `JOBS=N` env var:
 
 ```bash
-JOBS=4 ./build_ubuntu.sh   # pakai 4 thread
-JOBS=2 ./build_jetson.sh   # paling aman kalau RAM tipis
-JOBS=1 ./build_jetson.sh   # serial — paling lambat tapi paling stabil
+JOBS=4 ./build_ubuntu.sh   # use 4 threads
+JOBS=2 ./build_jetson.sh   # safest when RAM is tight
+JOBS=1 ./build_jetson.sh   # serial — slowest, but most stable
 ```
 
-### Apa saja yang dikerjakan script
+### What the script does
 
-1. Cek arsitektur host (gagal cepat kalau salah pakai)
-2. `apt-get update` dan install **semua** dependency (termasuk `git`, `cmake`)
-3. `git submodule update --init --recursive` untuk `thirdparty/sse2neon`
-4. Build & install Pangolin v0.9.1 dari source kalau belum ada
-5. Konfigurasi CMake & compile DSO ke direktori build terpisah
+1. Verifies the host architecture (fails fast if you ran the wrong script)
+2. `apt-get update` and installs **all** dependencies (including `git`, `cmake`)
+3. `git submodule update --init --recursive` for `thirdparty/sse2neon`
+4. Builds & installs Pangolin v0.9.1 from source if missing
+5. Configures CMake and compiles DSO into a separate build directory
 
 ---
 
 ## 4. Build (Manual)
 
-Kalau script otomatis gagal di tengah jalan, ikuti langkah-langkah ini:
+If the automatic script breaks halfway, do it step by step:
 
 ```bash
-# 1) Install dependency apt
+# 1) Install apt dependencies
 sudo apt-get update
 sudo apt-get install -y build-essential cmake git pkg-config \
     libsuitesparse-dev libeigen3-dev \
@@ -174,18 +175,18 @@ sudo apt-get install -y build-essential cmake git pkg-config \
     libwayland-dev libxkbcommon-dev wayland-protocols \
     libavcodec-dev libavutil-dev libavformat-dev libswscale-dev libavdevice-dev
 
-# 2) Init submodule (sse2neon)
+# 2) Initialize submodule (sse2neon)
 git submodule update --init --recursive
 
-# 3) Install Pangolin dari source (sekali saja)
+# 3) Install Pangolin from source (one-time)
 git clone --recursive --branch v0.9.1 https://github.com/stevenlovegrove/Pangolin.git ~/Pangolin
 cd ~/Pangolin && mkdir -p build && cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_PANGOLIN_PYTHON=OFF
 make -j2 && sudo make install && sudo ldconfig
 
-# 4) Build DSO (kembali ke folder project)
-cd /path/ke/dsoorin
-mkdir -p build_ubuntu      # atau build_arm di Jetson
+# 4) Build DSO (back in the project folder)
+cd /path/to/DSO
+mkdir -p build_ubuntu      # or build_arm on Jetson
 cd build_ubuntu
 cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j2
@@ -193,54 +194,54 @@ make -j2
 
 ---
 
-## 5. Menjalankan
+## 5. Running
 
-Setelah build sukses, tiga binary tersedia di `build_<arch>/bin/`:
+After a successful build, three binaries are available in `build_<arch>/bin/`:
 
-| Binary        | Untuk apa                                                          |
-| ------------- | ------------------------------------------------------------------ |
-| `dso_dataset` | Memutar dataset offline (sequence gambar + file kalibrasi)         |
-| `dso_live`    | Live capture dari source video (file/streaming) via OpenCV         |
-| `dso_camera`  | Real-time capture langsung dari kamera (USB / CSI)                 |
+| Binary        | Purpose                                                              |
+| ------------- | -------------------------------------------------------------------- |
+| `dso_dataset` | Plays back an offline dataset (image sequence + calibration file)    |
+| `dso_live`    | Live capture from a video source (file/stream) via OpenCV            |
+| `dso_camera`  | Real-time capture straight from a camera (USB / CSI)                 |
 
-Contoh menjalankan dataset:
+Example: running a dataset
 
 ```bash
-cd build_ubuntu/bin        # atau build_arm/bin
-./dso_dataset files=/path/ke/sequence calib=/path/ke/camera.txt mode=1
+cd build_ubuntu/bin        # or build_arm/bin
+./dso_dataset files=/path/to/sequence calib=/path/to/camera.txt mode=1
 ```
 
-Format file kalibrasi ada di `camera.txt` di root project (template).
-Penjelasan tiap mode & opsi ada di [README.md](README.md).
+A template calibration file lives at `camera.txt` in the project root.
+Detailed mode/option descriptions are in the original [README](README.md).
 
-### GUI Pangolin & Shader Fisheye
+### Pangolin GUI & Fisheye Shader
 
-`dso_dataset`, `dso_live`, dan `dso_camera` akan membuka window Pangolin
-dengan slider untuk parameter shader fisheye (alpha, beta, zoom, dst).
-Empat mode shader tersedia:
+`dso_dataset`, `dso_live`, and `dso_camera` all open a Pangolin window with
+sliders for the fisheye shader parameters (alpha, beta, zoom, etc.). Four
+shader modes are available:
 
-- `anypoint_mode1` — virtual perspective camera (rotasi alpha/beta + zoom)
-- `anypoint_mode2` — sama, tapi pakai Euler angles (thetaX/thetaY)
-- `panorama_tube`  — unwarp 360° silindris
-- `panorama_car`   — bird's-eye panorama untuk kamera kendaraan
+- `anypoint_mode1` — virtual perspective camera (alpha/beta + zoom)
+- `anypoint_mode2` — same, but using Euler angles (thetaX/thetaY)
+- `panorama_tube`  — 360° cylindrical unwarp
+- `panorama_car`   — bird's-eye panorama for vehicle-mounted cameras
 
-File shader ada di `shaders/` dan **dimuat saat runtime**, jadi bisa diedit
-tanpa rebuild — tinggal restart binary-nya.
+The shader files live in `shaders/` and are **loaded at runtime**, so you can
+edit them without rebuilding — just restart the binary.
 
 ---
 
 ## 6. Troubleshooting
 
-### `./build_*.sh: Permission denied` atau `command not found`
+### `./build_*.sh: Permission denied` or `command not found`
 
-Execute bit hilang setelah clone/extract. Solusi:
+The execute bit was lost after clone/extract. Fix:
 
 ```bash
 chmod +x build_ubuntu.sh
 ./build_ubuntu.sh
 ```
 
-atau panggil langsung dengan bash (tanpa perlu chmod):
+Or invoke via bash directly (no chmod needed):
 
 ```bash
 bash build_ubuntu.sh
@@ -248,15 +249,15 @@ bash build_ubuntu.sh
 
 ### `set: Illegal option -o pipefail`
 
-Sudah diperbaiki di versi terbaru — script sekarang pakai `set -e` saja
-supaya jalan di dash (`sh`) maupun bash. Kalau masih muncul, pastikan
-Anda pakai file build script versi terbaru dari repo ini.
+Already fixed in the latest version — the scripts now use `set -e` only so
+they run under both dash (`sh`) and bash. If you still see this, make sure
+you have the latest build scripts from this repo.
 
 ### `git: not found`
 
-Sudah diperbaiki di versi terbaru — `apt-get install` (yang ikut install `git`)
-sekarang dijalankan paling awal, **sebelum** `git submodule update`. Kalau
-masih muncul, install manual:
+Already fixed in the latest version — `apt-get install` (which installs `git`
+as part of the dependency set) now runs first, **before** `git submodule
+update`. If it still appears, install manually:
 
 ```bash
 sudo apt-get update && sudo apt-get install -y git
@@ -264,10 +265,10 @@ sudo apt-get update && sudo apt-get install -y git
 
 ### `libboost-python1.74-dev : Depends: python3-dev:any`
 
-Konflik klasik di Ubuntu 22.04 fresh saat memakai `libboost-all-dev`.
-Sudah diperbaiki di script — kita hanya install `libboost-system-dev` dan
-`libboost-thread-dev` (komponen Boost yang sebenarnya dipakai DSO).
-Kalau Anda terlanjur install `libboost-all-dev`, hapus dulu:
+A classic dependency conflict on fresh Ubuntu 22.04 when using
+`libboost-all-dev`. Fixed in the scripts — we only install
+`libboost-system-dev` and `libboost-thread-dev` (the Boost components DSO
+actually uses). If you already installed `libboost-all-dev`, remove it first:
 
 ```bash
 sudo apt-get remove --purge libboost-all-dev
@@ -277,17 +278,17 @@ sudo apt-get autoremove
 
 ### Build crash / OOM ("internal compiler error", "Killed")
 
-Terlalu banyak thread paralel saat compile. Turunkan:
+Too many parallel compile jobs. Turn them down:
 
 ```bash
 JOBS=2 ./build_ubuntu.sh
-# atau paling konservatif:
+# or the most conservative:
 JOBS=1 ./build_jetson.sh
 ```
 
 ### `Pangolin not found`
 
-Script otomatis akan build dari source. Kalau ingin force rebuild:
+The script will build it from source automatically. To force a rebuild:
 
 ```bash
 rm -rf ~/Pangolin
@@ -296,7 +297,7 @@ rm -rf ~/Pangolin
 
 ### `fatal error: SSE2NEON.h: No such file`
 
-Submodule `sse2neon` belum di-clone. Jalankan:
+The `sse2neon` submodule wasn't cloned. Run:
 
 ```bash
 git submodule update --init --recursive
@@ -304,56 +305,56 @@ git submodule update --init --recursive
 
 ### `undefined reference to cholmod_*` / `cxsparse_*`
 
-`libsuitesparse-dev` belum terpasang:
+`libsuitesparse-dev` isn't installed:
 
 ```bash
 sudo apt-get install -y libsuitesparse-dev
 ```
 
-### Salah arsitektur
+### Wrong architecture
 
-Script akan menolak kalau dijalankan di host yang salah:
+The script refuses to run on the wrong host:
 
-- `build_jetson.sh` hanya jalan di aarch64 (`uname -m` → `aarch64`)
-- `build_ubuntu.sh` hanya jalan di x86_64 (`uname -m` → `x86_64`)
+- `build_jetson.sh` only runs on aarch64 (`uname -m` → `aarch64`)
+- `build_ubuntu.sh` only runs on x86_64 (`uname -m` → `x86_64`)
 
-### Rebuild bersih
+### Clean rebuild
 
 ```bash
 rm -rf build_arm build_ubuntu
-./build_ubuntu.sh        # atau build_jetson.sh
+./build_ubuntu.sh        # or build_jetson.sh
 ```
 
 ---
 
-## 7. Struktur Direktori
+## 7. Directory Layout
 
 ```
-dsoorin/
-├── build_jetson.sh        # build script ARM/Jetson      → build_arm/
-├── build_ubuntu.sh        # build script Ubuntu x86_64   → build_ubuntu/
-├── CMakeLists.txt         # auto-detect ARM vs x86_64
-├── INSTALL.md             # file ini
-├── README.md              # dokumentasi DSO asli
-├── camera.txt             # template file kalibrasi kamera
-├── cmake/                 # modul CMake (FindSuiteParse, dll.)
-├── shaders/               # GLSL shader fisheye (dimuat runtime)
+DSO/
+├── build_jetson.sh        # ARM/Jetson build script      → build_arm/
+├── build_ubuntu.sh        # Ubuntu x86_64 build script   → build_ubuntu/
+├── CMakeLists.txt         # auto-detects ARM vs x86_64
+├── INSTALL.md             # this file
+├── README.md              # project overview
+├── camera.txt             # camera calibration template
+├── cmake/                 # CMake modules (FindSuiteParse, etc.)
+├── shaders/               # GLSL fisheye shaders (loaded at runtime)
 ├── src/
 │   ├── FullSystem/        # core SLAM (tracking + mapping)
 │   ├── OptimizationBackend/ # photometric bundle adjustment
 │   ├── IOWrapper/         # Pangolin viewer + shader manager + OpenCV IO
-│   └── util/              # kalibrasi, undistort, AnypointRemap (CPU)
+│   └── util/              # calibration, undistort, AnypointRemap (CPU)
 └── thirdparty/
-    ├── Sophus/            # Lie group (SE3/Sim3)
-    └── sse2neon/          # shim SSE→NEON (hanya dipakai saat build ARM)
+    ├── Sophus/            # Lie group library (SE3/Sim3)
+    └── sse2neon/          # SSE→NEON shim (only used on ARM builds)
 ```
 
 ---
 
-## 8. Untuk Maintainer — Sebelum Push ke GitHub
+## 8. For Maintainers — Before Pushing to GitHub
 
-Pastikan executable bit dari build script tersimpan di git index, supaya
-orang lain yang clone langsung bisa `./build_*.sh` tanpa perlu chmod dulu:
+Make sure the executable bit on the build scripts is stored in the git index,
+so anyone who clones can run `./build_*.sh` directly without chmod:
 
 ```bash
 chmod +x build_jetson.sh build_ubuntu.sh
@@ -363,12 +364,12 @@ git commit -m "Make build scripts executable"
 git push
 ```
 
-Cek dengan `git ls-files --stage build_*.sh` — bit pertama harus `100755`
-(executable), bukan `100644`.
+Verify with `git ls-files --stage build_*.sh` — the first column should be
+`100755` (executable), not `100644`.
 
 ---
 
-## 9. Lisensi
+## 9. License
 
-Lihat [LICENSE](LICENSE). DSO asli rilis di bawah GPLv3 oleh penulis aslinya
-(J. Engel, V. Koltun, D. Cremers).
+See [LICENSE](LICENSE). The original DSO is released under GPLv3 by its
+original authors (J. Engel, V. Koltun, D. Cremers).
